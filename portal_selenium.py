@@ -12,17 +12,20 @@ OPENING = "https://sis-main.hku.hk/cs/sisprod/cache/PS_CS_STATUS_OPEN_ICN_1.gif"
 SUCCEED = "/cs/sisprod/cache/PS_CS_STATUS_SUCCESS_ICN_1.gif"
 
 with open("pwd.txt", "r") as f:
-    USERNAME, PASSWORD = [i[:-1] for i in f.readlines()]
+    USERNAME, PASSWORD = f.read().split('\n')[:2]
 
 REFRESH_RATE = 5 * 60
 TIMEOUT = 30
+MAX_REATTEMPTS = 10
 
 options = Options()
 options.add_argument('--headless')
 
 driver = webdriver.Chrome(options=options)
 
-while True:
+reattempts = 0
+
+while reattempts < MAX_REATTEMPTS:
     try:
         driver.get(PORTAL_URL)
 
@@ -41,7 +44,7 @@ while True:
             EC.presence_of_element_located((By.CSS_SELECTOR, "#crefli_Z_HC_SSR_SSENRL_CART_LNK > a")))
         add_class_link.click()
 
-        while True:
+        while reattempts < MAX_REATTEMPTS:
             frame = WebDriverWait(driver, TIMEOUT).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "#ptifrmtgtframe")))
             driver.switch_to.frame(frame)
@@ -58,6 +61,10 @@ while True:
             course_num = len(temporary_list.find_elements(By.CSS_SELECTOR, "tr")) - 1
 
             print("Refreshed at", datetime.now())
+            if course_num == 0:
+                print("No class in temporary list!")
+                exit(0)
+
             for course in range(course_num):
                 course_status = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located(
                     (By.XPATH, f'//*[@id="win0divDERIVED_REGFRM1_SSR_STATUS_LONG${course}"]/div/img'))).get_attribute(
@@ -77,18 +84,21 @@ while True:
 
                     if result == SUCCEED:
                         print("Course selection has been completed\7")
-                        exit(0)
                     else:
-                        print("Attempted selection but failed\7")
-                        exit(1)
+                        reattempts += 1
+                        print(f"Attempted selection but failed. Retrying {reattempts}/{MAX_REATTEMPTS}\7")
 
-            print("All classes closed")
+                    continue
+
+            print("All courses closed")
+            reattempts = 0
 
             sleep(REFRESH_RATE)
             driver.refresh()
 
     except TimeoutException:
-        print("Warning: Encountered a timeout! Retrying...")
+        reattempts += 1
+        print(f"Warning: Encountered a timeout! Retrying {reattempts}/{MAX_REATTEMPTS}\7")
         continue
 
     finally:
