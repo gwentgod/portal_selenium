@@ -2,7 +2,7 @@ from time import sleep
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.wait import WebDriverWait, TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -19,9 +19,9 @@ TIMEOUT = 30
 MAX_REATTEMPTS = 10
 
 options = Options()
-options.add_argument('--headless')
+options.headless = True
 
-driver = webdriver.Chrome(options=options)
+driver = webdriver.Firefox(options=options)
 
 reattempts = 0
 
