@@ -11,10 +11,10 @@ PORTAL_URL = "https://hkuportal.hku.hk/login.html"
 OPENING = "https://sis-main.hku.hk/cs/sisprod/cache/PS_CS_STATUS_OPEN_ICN_1.gif"
 SUCCEED = "/cs/sisprod/cache/PS_CS_STATUS_SUCCESS_ICN_1.gif"
 
-USERNAME = ""
-PASSWORD = ""
+with open("pwd.txt", "r") as f:
+    USERNAME, PASSWORD = [i[:-1] for i in f.readlines()]
 
-REFRESH_RATE = 5
+REFRESH_RATE = 5 * 60
 TIMEOUT = 30
 
 options = Options()
@@ -82,10 +82,13 @@ while True:
                         print("Attempted selection but failed\7")
                         exit(1)
 
+            print("All classes closed")
+
             sleep(REFRESH_RATE)
             driver.refresh()
 
     except TimeoutException:
+        print("Warning: Encountered a timeout! Retrying...")
         continue
 
     finally:
