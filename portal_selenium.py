@@ -1,5 +1,6 @@
 from time import sleep
 from datetime import datetime
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
@@ -9,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 PORTAL_URL = "https://hkuportal.hku.hk/login.html"
 
 OPENING = "https://sis-main.hku.hk/cs/sisprod/cache/PS_CS_STATUS_OPEN_ICN_1.gif"
+CLOSED = "https://sis-main.hku.hk/cs/sisprod/cache/PS_CS_STATUS_CLOSED_ICN_1.gif"
 SUCCEED = "/cs/sisprod/cache/PS_CS_STATUS_SUCCESS_ICN_1.gif"
 
 with open("pwd.txt", "r") as f:
@@ -17,6 +19,7 @@ with open("pwd.txt", "r") as f:
 REFRESH_RATE = 5 * 60
 TIMEOUT = 30
 MAX_REATTEMPTS = 10
+
 
 options = Options()
 options.headless = True
@@ -45,6 +48,8 @@ while reattempts < MAX_REATTEMPTS:
         add_class_link.click()
 
         while reattempts < MAX_REATTEMPTS:
+            driver.refresh()
+
             frame = WebDriverWait(driver, TIMEOUT).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "#ptifrmtgtframe")))
             driver.switch_to.frame(frame)
@@ -56,49 +61,49 @@ while reattempts < MAX_REATTEMPTS:
             sem_2.click()
             cont.click()
 
-            temporary_list = WebDriverWait(driver, TIMEOUT).until(
-                EC.presence_of_element_located((By.XPATH, '//*[@id="SSR_REGFORM_VW$scroll$0"]/tbody/tr[2]/td/table')))
-            course_num = len(temporary_list.find_elements(By.CSS_SELECTOR, "tr")) - 1
+            temporary_list = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_all_elements_located(
+                    (By.XPATH, '//*[@id="SSR_REGFORM_VW$scroll$0"]/tbody/tr[2]/td/table/tbody/tr')))[1:]
 
             print("Refreshed at", datetime.now())
-            if course_num == 0:
-                print("No class in temporary list!")
+
+            if temporary_list[0].find_element(By.CSS_SELECTOR, "div").get_attribute("id") == "win0divP_NO_CLASSES$0":
+                print("No class in temporary list!\7")
                 exit(0)
 
-            for course in range(course_num):
+            for course in temporary_list:
+                course_name = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "[id^=P_CLASS_NAME]"))).text.split('\n')[0]
                 course_status = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located(
-                    (By.XPATH, f'//*[@id="win0divDERIVED_REGFRM1_SSR_STATUS_LONG${course}"]/div/img'))).get_attribute(
-                    "src")
+                    (By.CSS_SELECTOR, "[id^=win0divDERIVED_REGFRM1_SSR_STATUS_LONG] img"))).get_attribute("src")
 
                 if course_status == OPENING:
+                    print(course_name, "opening, selection proceeding\7")
+
                     proceed = WebDriverWait(driver, TIMEOUT).until(
                         EC.presence_of_element_located((By.XPATH, f'//*[@id="DERIVED_REGFRM1_LINK_ADD_ENRL$82$"]')))
                     proceed.click()
-
                     finish = WebDriverWait(driver, TIMEOUT).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, "#DERIVED_REGFRM1_SSR_PB_SUBMIT")))
                     finish.click()
 
                     result = WebDriverWait(driver, TIMEOUT).until(
                         EC.presence_of_element_located((By.XPATH, f'//*[@id="win0divDERIVED_REGFRM1_SSR_STATUS_LONG${course}"]/div/img'))).get_attribute("src")
-
                     if result == SUCCEED:
-                        print("Course selection has been completed\7")
+                        print("Selection has been completed")
                     else:
                         reattempts += 1
                         print(f"Attempted selection but failed. Retrying {reattempts}/{MAX_REATTEMPTS}\7")
-
                     continue
 
-            print("All courses closed")
+                elif course_status == CLOSED:
+                    print(course_name, "is closed")
+
             reattempts = 0
-
             sleep(REFRESH_RATE)
-            driver.refresh()
 
-    except TimeoutException:
+    except Exception as e:
         reattempts += 1
-        print(f"Warning: Encountered a timeout! Retrying {reattempts}/{MAX_REATTEMPTS}\7")
+        print(f"{e}\n{reattempts}/{MAX_REATTEMPTS}\7")
         continue
 
     finally:
