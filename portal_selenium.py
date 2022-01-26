@@ -20,14 +20,23 @@ with open("pwd.txt", "r") as f:
 REFRESH_RATE = 5 * 60
 TIMEOUT = 30
 MAX_REATTEMPTS = 3
-MAX_REFRESHES = 3
+MAX_REFRESHES = 2
 
 
 class Enrollee:
     def __init__(self):
-        options = Options()
-        options.headless = True
-        self.driver = webdriver.Firefox(options=options)
+        self.options = Options()
+        self.options.headless = True
+        self.driver = None
+
+    def start(self):
+        try:
+            self.driver.quit()
+        except:
+            pass
+
+        # self.driver = webdriver.Firefox(options=options)
+        self.driver = webdriver.Chrome()
         self.driver.get(PORTAL_URL)
 
         username_input = WebDriverWait(self.driver, TIMEOUT).until(EC.presence_of_element_located(
@@ -44,12 +53,6 @@ class Enrollee:
         add_class_link = WebDriverWait(self.driver, TIMEOUT).until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, "#crefli_Z_HC_SSR_SSENRL_CART_LNK > a")))
         add_class_link.click()
-
-    def __del__(self):
-        try:
-            self.driver.quit()
-        except:
-            pass
 
     def proceed(self):
         proceed = WebDriverWait(self.driver, TIMEOUT).until(EC.presence_of_element_located(
@@ -81,7 +84,6 @@ class Enrollee:
                 print(f"Unable to add {result_name}:\n{result_message}")
 
         if all_failed:
-            print("Retrying")
             return 1
 
         return 0
@@ -124,7 +126,9 @@ class Enrollee:
             elif course_status == CLOSED:
                 print(course_name, "is closed")
 
-        return 2
+        print(f"Will refresh in {REFRESH_RATE} seconds\n")
+        sleep(REFRESH_RATE)
+        return 0
 
 
 def main():
@@ -132,32 +136,31 @@ def main():
     while True:
         try:
             enrollee = Enrollee()
+            enrollee.start()
 
             refreshes = 0
             while refreshes < MAX_REFRESHES:
                 check_result = enrollee.check_status()
-                if check_result == 2:
-                    refreshes = 0
-                    print(f"Will refresh in {REFRESH_RATE} seconds")
-                    sleep(REFRESH_RATE)
-                elif check_result == 1:
+                if check_result == 1:
                     refreshes += 1
+                    print(f"Retrying {refreshes}/{MAX_REFRESHES}")
                     continue
 
                 reattempts = 0
+                refreshes = 0
 
             raise Exception("Reached maximum refreshes")
 
         except Exception as e:
+            print(e)
             reattempts += 1
-            del enrollee
 
             if reattempts > MAX_REATTEMPTS:
-                print(f"Reached maximum reattempts, will retry in {REFRESH_RATE} seconds\7")
+                print(f"Reached maximum reattempts, will retry in {REFRESH_RATE} seconds\7\n")
                 sleep(REFRESH_RATE)
-            sleep(1)
 
-            print(f"{e}\nRestarting webdriver {reattempts}/{MAX_REATTEMPTS}")
+            print(f"Restarting webdriver {reattempts}/{MAX_REATTEMPTS}")
+            enrollee.start()
             continue
 
 
